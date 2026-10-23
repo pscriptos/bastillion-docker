@@ -33,7 +33,7 @@ docker run -d \
   -e PORT=8080 \
   -e TLS_ENABLED=false \
   -e GEN_DB_PASS=true \
-  bastillion:latest
+  bastillion-docker:latest
 ```
 
 ### Mit Docker Compose (inkl. Traefik)
@@ -45,7 +45,7 @@ version: "3.8"
 
 services:
   bastillion:
-    image: bastillion:latest
+    image: bastillion-docker:latest
     container_name: bastillion
     hostname: bastillion
     restart: unless-stopped

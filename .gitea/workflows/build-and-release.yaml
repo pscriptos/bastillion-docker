@@ -21,7 +21,7 @@ on:
         default: ''
 
 env:
-  IMAGE_NAME: bastillion
+  IMAGE_NAME: bastillion-docker
   UPSTREAM_REPO: Loophole-LLC/Bastillion
 
 jobs:
@@ -105,12 +105,11 @@ jobs:
             BASTILLION_VERSION=${{ steps.version_check.outputs.version }}
           tags: |
             ${{ steps.version_check.outputs.registry }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
-            ${{ steps.version_check.outputs.registry }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version_check.outputs.version }}
             ${{ steps.version_check.outputs.registry }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version_check.outputs.tag }}
           labels: |
-            org.opencontainers.image.title=Bastillion
+            org.opencontainers.image.title=bastillion-docker
             org.opencontainers.image.description=Modern web-based SSH console and key management tool
-            org.opencontainers.image.version=${{ steps.version_check.outputs.version }}
+            org.opencontainers.image.version=${{ steps.version_check.outputs.tag }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
       - name: Create Git Tag and Release

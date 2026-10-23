@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   bastillion:
-    image: bastillion:latest
+    image: bastillion-docker:latest
     container_name: bastillion
     hostname: bastillion
     restart: unless-stopped
