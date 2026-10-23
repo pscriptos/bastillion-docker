@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  bastillion:
+    image: bastillion:latest
+    container_name: bastillion
+    hostname: bastillion
+    restart: unless-stopped
+    networks:
+      bastillion_net:
+        ipv4_address: 172.28.0.10
+    volumes:
+      - ./data:/data
+    environment:
+      # Konsolidiertes Datenverzeichnis (H2 DB, Keystore, SSH Keys)
+      - CONFIG_DIR=/data
+      # Interner HTTP-Port (hinter Reverse Proxy)
+      - PORT=8080
+      # Intern unverschlüsselt (Reverse Proxy übernimmt HTTPS & Zertifikate)
+      - TLS_ENABLED=false
+      # Automatisches Generieren des DB-Passworts beim ersten Start
+      - GEN_DB_PASS=true
+      # Client-IP-Header für echte Quell-IPs in den Audit-Logs
+      - CLIENT_IP_HEADER=X-Forwarded-For
+      # Zeitzone
+      - TZ=Europe/Berlin
+    labels:
+      - "traefik.enable=true"
+      # HTTP zu HTTPS Redirect
+      - "traefik.http.routers.bastillion-http.rule=Host(`bastillion.example.com`)"
+      - "traefik.http.routers.bastillion-http.entrypoints=web"
+      - "traefik.http.routers.bastillion-http.middlewares=redirect-to-https@file"
+      # HTTPS Router
+      - "traefik.http.routers.bastillion.rule=Host(`bastillion.example.com`)"
+      - "traefik.http.routers.bastillion.entrypoints=websecure"
+      - "traefik.http.routers.bastillion.tls=true"
+      - "traefik.http.routers.bastillion.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bastillion.service=bastillion-svc"
+      - "traefik.http.services.bastillion-svc.loadbalancer.server.port=8080"
+
+networks:
+  bastillion_net:
+    name: bastillion.dockernetwork.local
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+          ip_range: 172.28.0.128/25

@@ -1,0 +1,5 @@
+data/
+*.log
+*.jar
+.DS_Store
+Thumbs.db

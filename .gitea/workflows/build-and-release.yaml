@@ -1,0 +1,139 @@
+# Bastillion Docker CI/CD - Upstream Release Watcher & Multi-Arch Build
+# Prüft regelmäßig auf neue Releases von Loophole-LLC/Bastillion und baut
+# Multi-Arch Images (linux/amd64 & linux/arm64) für die Container Registry.
+name: Upstream Release Watcher & Multi-Arch Build
+
+on:
+  schedule:
+    # Alle 6 Stunden prüfen
+    - cron: '0 */6 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - '.gitea/workflows/**'
+  workflow_dispatch:
+    inputs:
+      force_version:
+        description: 'Spezifische Bastillion-Version erzwingen (z. B. 6.0.3) oder leer für neueste'
+        required: false
+        default: ''
+
+env:
+  IMAGE_NAME: bastillion
+  UPSTREAM_REPO: Loophole-LLC/Bastillion
+
+jobs:
+  check-and-build:
+    name: Check & Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine upstream version
+        id: version_check
+        run: |
+          set -e
+          if [ -n "${{ inputs.force_version }}" ]; then
+            TAG="v${{ inputs.force_version }}"
+            TAG="v${TAG#v}"
+            VERSION="${TAG#v}"
+            echo "Manuelle Version vorgegeben: ${VERSION}"
+          else
+            echo "Frage neuestes Release von GitHub (${UPSTREAM_REPO}) ab..."
+            RELEASE_JSON=$(curl -sSL "https://api.github.com/repos/${UPSTREAM_REPO}/releases/latest")
+            TAG=$(echo "$RELEASE_JSON" | grep -m 1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+            if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+              echo "::error::Konnte neuestes Release von ${UPSTREAM_REPO} nicht ermitteln."
+              exit 1
+            fi
+            VERSION="${TAG#v}"
+            echo "Neuestes Upstream-Release gefunden: ${TAG} (Version: ${VERSION})"
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          # Prüfen, ob dieses Git-Tag im lokalen Repo bereits existiert
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} existiert bereits im Repository."
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              echo "Kein neues Release vorhanden. Workflow beendet."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Build wird trotz existierendem Tag fortgesetzt (Event: ${{ github.event_name }})."
+          fi
+
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+
+          # Registry-URL ermitteln (Fallback auf aktuellen Server / Host)
+          REGISTRY="${{ vars.REGISTRY_URL || github.server_url }}"
+          REGISTRY="${REGISTRY#https://}"
+          REGISTRY="${REGISTRY#http://}"
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: steps.version_check.outputs.should_build == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.version_check.outputs.should_build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        if: steps.version_check.outputs.should_build == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.REGISTRY_URL || github.server_url }}
+          username: ${{ secrets.REGISTRY_USER || github.actor }}
+          password: ${{ secrets.REGISTRY_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Multi-Arch Docker Image
+        if: steps.version_check.outputs.should_build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            BASTILLION_VERSION=${{ steps.version_check.outputs.version }}
+          tags: |
+            ${{ steps.version_check.outputs.registry }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            ${{ steps.version_check.outputs.registry }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version_check.outputs.version }}
+            ${{ steps.version_check.outputs.registry }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version_check.outputs.tag }}
+          labels: |
+            org.opencontainers.image.title=Bastillion
+            org.opencontainers.image.description=Modern web-based SSH console and key management tool
+            org.opencontainers.image.version=${{ steps.version_check.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Create Git Tag and Release
+        if: steps.version_check.outputs.should_build == 'true'
+        run: |
+          TAG="${{ steps.version_check.outputs.tag }}"
+          VERSION="${{ steps.version_check.outputs.version }}"
+          API_URL="${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases"
+          
+          echo "Erstelle Release ${TAG}..."
+          PAYLOAD=$(cat <<EOF
+          {
+            "tag_name": "${TAG}",
+            "target_commitish": "${{ github.sha }}",
+            "name": "Bastillion ${TAG}",
+            "body": "Automatisierter Docker Multi-Arch Build für **Bastillion ${TAG}** (Java 21, Ed25519 Support).\n\nUpstream Release: https://github.com/${UPSTREAM_REPO}/releases/tag/${TAG}",
+            "draft": false,
+            "prerelease": false
+          }
+          EOF
+          )
+
+          curl -s -X POST "$API_URL" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo "Release-Erstellung abgeschlossen."

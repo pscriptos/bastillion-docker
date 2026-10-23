@@ -1,0 +1,6 @@
+.git
+.gitea
+.github
+data/
+*.log
+*.tmp
