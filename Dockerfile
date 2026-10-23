@@ -13,7 +13,7 @@ ARG BASTILLION_VERSION=6.0.3
 ENV CONFIG_DIR=/data \
     PORT=8080 \
     TLS_ENABLED=false \
-    GEN_DB_PASS=true \
+    JAVA_TOOL_OPTIONS=-DGEN_DB_PASS=true \
     CLIENT_IP_HEADER=X-Forwarded-For
 
 # Minimale Tools für Healthcheck & Netzwerkanfragen
