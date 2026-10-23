@@ -1,10 +1,24 @@
 # Bastillion Docker (Multi-Arch)
 
 [![Docker Multi-Arch](https://img.shields.io/badge/Architecture-amd64%20%7C%20arm64-blue.svg)](#)
+[![Container Registry](https://img.shields.io/badge/Container%20Registry-Gitea%20Packages-blue.svg)](https://git.techniverse.net/scriptos/-/packages/container/bastillion-docker)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](#)
 [![Upstream](https://img.shields.io/badge/Upstream-Loophole--LLC%2FBastillion-brightgreen.svg)](https://github.com/Loophole-LLC/Bastillion)
 
 Vollständig containerisiertes **Bastillion 6** (ehemals *KeyBox*) als schlankes Multi-Arch Docker Image (`linux/amd64` und `linux/arm64`) mit **automatischen Upstream-Builds** bei neuen GitHub-Releases.
+
+---
+
+## 📦 Container Registry
+
+Die vorgefertigten Multi-Arch Images stehen in der Gitea Container Registry bereit:
+
+* **Paket-Übersicht:** [https://git.techniverse.net/scriptos/-/packages/container/bastillion-docker](https://git.techniverse.net/scriptos/-/packages/container/bastillion-docker)
+* **Image URL:** `git.techniverse.net/scriptos/bastillion-docker:latest`
+
+```bash
+docker pull git.techniverse.net/scriptos/bastillion-docker:latest
+```
 
 ---
 
@@ -33,7 +47,7 @@ docker run -d \
   -e PORT=8080 \
   -e TLS_ENABLED=false \
   -e GEN_DB_PASS=true \
-  bastillion-docker:latest
+  git.techniverse.net/scriptos/bastillion-docker:latest
 ```
 
 ### Mit Docker Compose (inkl. Traefik)
@@ -45,7 +59,7 @@ version: "3.8"
 
 services:
   bastillion:
-    image: bastillion-docker:latest
+    image: git.techniverse.net/scriptos/bastillion-docker:latest
     container_name: bastillion
     hostname: bastillion
     restart: unless-stopped
@@ -134,7 +148,7 @@ tar -cpzf bastillion_backup_$(date +%Y%m%d_%H%M%S).tar.gz ./data
 
 Dieses Repository nutzt CI/CD Actions, um alle 6 Stunden die offizielle [Loophole-LLC Bastillion Release API](https://github.com/Loophole-LLC/Bastillion/releases) abzufragen.
 
-Sobald ein neues Upstream-Tag erscheint, baut die Pipeline vollautomatisch Multi-Arch Images (`linux/amd64` und `linux/arm64`) und pusht sie in die Container Registry.
+Sobald ein neues Upstream-Tag erscheint, baut die Pipeline vollautomatisch Multi-Arch Images (`linux/amd64` und `linux/arm64`) und pusht sie in die [Container Registry](https://git.techniverse.net/scriptos/-/packages/container/bastillion-docker).
 
 ---
 
